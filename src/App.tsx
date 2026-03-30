@@ -20,7 +20,7 @@ type Page = 'landing' | 'form' | 'success';
 const TOTAL_STEPS = 8;
 
 // 🔗 GOOGLE APPS SCRIPT URL — Conectado y funcional
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHAK2CX25rlc_ZB16wzi1_c8os__NBeFUfR8pm4OFNeDzNNDo22qIZbo0tOIuOU4RY/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz17w0PL8O-v8hK6y6N_xjJwdnNyFnI7NRtmhpBmdd6Ey2Yi-vuqgWX_qLP607maHfm/exec';
 
 const App: React.FC = () => {
   const [page, setPage] = useState<Page>('landing');
