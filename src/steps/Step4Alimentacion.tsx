@@ -46,7 +46,7 @@ const Step4Alimentacion: React.FC<Props> = ({ data, onChange, onRadioChange, onC
           onChange={onChange} type="time" />
       </Col>
       <Col xs={12} sm={4}>
-        <InputField label="⏰ Comida" name="horarioComida" value={data.horarioComida}
+        <InputField label="⏰ Almuerzo" name="horarioComida" value={data.horarioComida}
           onChange={onChange} type="time" />
       </Col>
       <Col xs={12} sm={4}>
@@ -155,6 +155,81 @@ const Step4Alimentacion: React.FC<Props> = ({ data, onChange, onRadioChange, onC
         <TextAreaField label="💚 Alimentos que te encantan" name="alimentosFavoritos"
           value={data.alimentosFavoritos} onChange={onChange}
           placeholder="Pollo, arroz, frutas, huevo..." />
+      </Col>
+    </Row>
+
+    <hr style={{ borderColor: 'var(--dark-500)', margin: '28px 0' }} />
+
+    {/* Macronutrientes Disponibles */}
+    <div className="mb-4">
+      <h3 className="section-title" style={{ fontSize: '1.2rem', marginBottom: '8px' }}>
+        🛒 Alimentos que puedes comprar
+      </h3>
+      <p className="section-subtitle">
+        Selecciona los alimentos disponibles para tu plan de dieta:
+      </p>
+    </div>
+
+    {/* Carbohidratos */}
+    <Row>
+      <Col xs={12}>
+        <CheckboxGroup
+          label="🍚 Carbohidratos (selecciona los que puedes comprar)"
+          values={data.carbsSelect}
+          onChange={(vals) => onCheckboxChange('carbsSelect', vals)}
+          options={[
+            { value: 'papa', label: '🥔 Papa' },
+            { value: 'arroz', label: '🍚 Arroz' },
+            { value: 'camote', label: '🍠 Camote' },
+            { value: 'arroz_integral', label: '🌾 Arroz integral' },
+            { value: 'pan_integral', label: '🥖 Pan integral' },
+            { value: 'avena', label: '🥣 Avena' },
+            { value: 'quinoa', label: '🌿 Quinoa' },
+            { value: 'lenteja', label: '🫘 Lenteja' },
+            { value: 'frijoles', label: '🫘 Frijoles' },
+          ]}
+        />
+      </Col>
+    </Row>
+
+    {/* Proteínas */}
+    <Row className="mt-3">
+      <Col xs={12}>
+        <CheckboxGroup
+          label="🥩 Proteínas (selecciona las que puedes comprar)"
+          values={data.proteinasSelect}
+          onChange={(vals) => onCheckboxChange('proteinasSelect', vals)}
+          options={[
+            { value: 'pollo', label: '🍗 Pollo' },
+            { value: 'huevo', label: '🥚 Huevo' },
+            { value: 'pescado', label: '🐟 Pescado' },
+            { value: 'atun', label: '🐟 Atún' },
+            { value: 'res', label: '🥩 Res' },
+            { value: 'carne_molida', label: '🍖 Carne molida' },
+            { value: 'jamon_pavo', label: '🦃 Jamón de pavo' },
+            { value: 'bacon', label: '🥓 Bacon' },
+          ]}
+        />
+      </Col>
+    </Row>
+
+    {/* Grasas */}
+    <Row className="mt-3">
+      <Col xs={12}>
+        <CheckboxGroup
+          label="🥑 Grasas saludables (selecciona las que puedes comprar)"
+          values={data.grasasSelect}
+          onChange={(vals) => onCheckboxChange('grasasSelect', vals)}
+          options={[
+            { value: 'frutos_secos', label: '🥜 Frutos secos' },
+            { value: 'almendra', label: '🌰 Almendra' },
+            { value: 'aceite_oliva', label: '🫒 Aceite de oliva' },
+            { value: 'aceite_aguacate', label: '🥑 Aceite de aguacate' },
+            { value: 'aceite_coco', label: '🥥 Aceite de coco' },
+            { value: 'mantequilla_mani', label: '🥜 Mantequilla de maní' },
+            { value: 'mantequilla_almendras', label: '🌰 Mantequilla de almendras' },
+          ]}
+        />
       </Col>
     </Row>
   </div>

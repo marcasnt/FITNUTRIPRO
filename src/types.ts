@@ -42,6 +42,10 @@ export interface FormData {
   alimentosFavoritos: string;
   restriccionDieta: string[];
   otraRestriccion: string;
+  // Macronutrientes disponibles
+  carbsSelect: string[];
+  proteinasSelect: string[];
+  grasasSelect: string[];
 
   // Step 5: Actividad Física
   realizaEjercicio: string;
@@ -112,6 +116,9 @@ export const initialFormData: FormData = {
   alimentosFavoritos: '',
   restriccionDieta: [],
   otraRestriccion: '',
+  carbsSelect: [],
+  proteinasSelect: [],
+  grasasSelect: [],
   realizaEjercicio: '',
   tipoEjercicio: '',
   frecuenciaEjercicio: '',
