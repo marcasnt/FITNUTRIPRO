@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Container, Row, Col } from 'react-bootstrap';
 import { FormData, initialFormData } from './types';
 import StepIndicator from './components/StepIndicator';
@@ -10,29 +10,140 @@ import Step5Ejercicio from './steps/Step5Ejercicio';
 import Step6Lifestyle from './steps/Step6Lifestyle';
 import Step7Objetivos from './steps/Step7Objetivos';
 import Step8Fotos from './steps/Step8Fotos';
+import Step9Review from './steps/Step9Review';
+import { useToast } from './components/Toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Confetti, StepCompleteCelebration } from './components/Confetti';
 import {
   ArrowLeft, ArrowRight, Send, Dumbbell, CheckCircle, Sparkles,
   Shield, Clock, Heart, Instagram, Phone, Mail, Flame, Zap,
-  Trophy, Target, ChevronDown,
+  Trophy, Target, ChevronDown, RotateCcw, X, FileText,
 } from 'lucide-react';
 
 type Page = 'landing' | 'form' | 'success';
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
+const STORAGE_KEY = 'fitnutri_form_data';
+const STORAGE_STEP_KEY = 'fitnutri_current_step';
+const STORAGE_TIMESTAMP_KEY = 'fitnutri_timestamp';
 
 // 🔗 GOOGLE APPS SCRIPT URL — Conectado y funcional
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2uOYHP-6_XFpLhipjE1NISjfuboN-4y9ZKEg_a3Ju29_mpX4wwDMy5u5Ee5mrGkAE/exec';
 
 const App: React.FC = () => {
+  const { showToast } = useToast();
   const [page, setPage] = useState<Page>('landing');
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [showRestoreBanner, setShowRestoreBanner] = useState(false);
+  const [showStepCelebration, setShowStepCelebration] = useState(false);
+  const [showSuccessConfetti, setShowSuccessConfetti] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
   const scrollToTop = () => {
     if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // ========== VALIDATION ==========
+  const validateStep = useCallback((step: number, data: FormData): Partial<Record<keyof FormData, string>> => {
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
+    
+    if (step === 0) {
+      if (!data.nombre.trim()) newErrors.nombre = 'El nombre es obligatorio';
+      if (!data.apellido.trim()) newErrors.apellido = 'El apellido es obligatorio';
+      if (!data.email.trim()) {
+        newErrors.email = 'El email es obligatorio';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        newErrors.email = 'Email inválido';
+      }
+      if (!data.telefono.trim()) newErrors.telefono = 'El teléfono es obligatorio';
+      if (!data.fechaNacimiento) newErrors.fechaNacimiento = 'La fecha de nacimiento es obligatoria';
+      if (!data.genero) newErrors.genero = 'Selecciona tu sexo biológico';
+    }
+    
+    if (step === 1) {
+      if (!data.peso) newErrors.peso = 'El peso es obligatorio';
+      if (!data.estatura) newErrors.estatura = 'La estatura es obligatoria';
+    }
+    
+    if (step === 7) {
+      // Fotos opcionales pero recomendadas
+    }
+    
+    return newErrors;
+  }, []);
+
+  const isStepValid = useCallback((step: number, data: FormData): boolean => {
+    return Object.keys(validateStep(step, data)).length === 0;
+  }, [validateStep]);
+
+  // ========== LOCAL STORAGE ==========
+  const saveToStorage = useCallback((data: FormData, step: number) => {
+    try {
+      // Files can't be stored in localStorage, so we store a flag
+      const storageData = {
+        ...data,
+        fotoFrente: data.fotoFrente ? '__FILE_EXISTS__' : null,
+        fotoEspalda: data.fotoEspalda ? '__FILE_EXISTS__' : null,
+        fotoPerfil: data.fotoPerfil ? '__FILE_EXISTS__' : null,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
+      localStorage.setItem(STORAGE_STEP_KEY, String(step));
+      localStorage.setItem(STORAGE_TIMESTAMP_KEY, Date.now().toString());
+    } catch (e) {
+      console.warn('No se pudo guardar en localStorage:', e);
+    }
+  }, []);
+
+  const loadFromStorage = useCallback((): { data: Partial<FormData>; step: number } | null => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const savedStep = localStorage.getItem(STORAGE_STEP_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          data: parsed,
+          step: savedStep ? parseInt(savedStep, 10) : 0,
+        };
+      }
+    } catch (e) {
+      console.warn('Error al cargar de localStorage:', e);
+    }
+    return null;
+  }, []);
+
+  const clearStorage = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_STEP_KEY);
+    localStorage.removeItem(STORAGE_TIMESTAMP_KEY);
+  }, []);
+
+  // ========== EFFECTS ==========
+  // Check for saved data on mount
+  useEffect(() => {
+    const saved = loadFromStorage();
+    if (saved && saved.data && Object.keys(saved.data).length > 0) {
+      const hasData = Object.entries(saved.data).some(([key, val]) => {
+        if (key === 'fotoFrente' || key === 'fotoEspalda' || key === 'fotoPerfil') return false;
+        return val && val !== '' && (Array.isArray(val) ? val.length > 0 : true);
+      });
+      if (hasData) {
+        setShowRestoreBanner(true);
+      }
+    }
+  }, [loadFromStorage]);
+
+  // Auto-save on form data change
+  useEffect(() => {
+    if (page === 'form') {
+      const timeout = setTimeout(() => {
+        saveToStorage(formData, currentStep);
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [formData, currentStep, page, saveToStorage]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -53,9 +164,51 @@ const App: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: file }));
   }, []);
 
-  const nextStep = () => { if (currentStep < TOTAL_STEPS - 1) { setCurrentStep((p) => p + 1); scrollToTop(); } };
-  const prevStep = () => { if (currentStep > 0) { setCurrentStep((p) => p - 1); scrollToTop(); } };
-  const goToStep = (step: number) => { setCurrentStep(step); scrollToTop(); };
+  // Step animation state
+  const [[pageStep, direction], setPageStep] = useState([0, 0]);
+
+  // Celebración al cambiar de paso
+  const celebrateStepComplete = () => {
+    setShowStepCelebration(true);
+    setTimeout(() => setShowStepCelebration(false), 800);
+  };
+
+  const nextStep = useCallback(() => {
+    // Validate current step before advancing
+    const stepErrors = validateStep(currentStep, formData);
+    setErrors(stepErrors);
+    
+    if (Object.keys(stepErrors).length > 0) {
+      showToast('Completa los campos obligatorios para continuar', 'warning');
+      return;
+    }
+    
+    if (currentStep < TOTAL_STEPS - 1) {
+      setPageStep([pageStep + 1, 1]);
+      setCurrentStep((p) => p + 1);
+      setErrors({});
+      celebrateStepComplete();
+      scrollToTop();
+    }
+  }, [currentStep, formData, validateStep, pageStep, showToast]);
+
+  const prevStep = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep((p) => p - 1);
+      setErrors({});
+      setPageStep([pageStep - 1, -1]);
+      scrollToTop();
+    }
+  }, [currentStep]);
+
+  const goToStep = useCallback((step: number) => {
+    // Only allow going to steps that are valid to reach
+    if (step <= currentStep || isStepValid(currentStep, formData)) {
+      setCurrentStep(step);
+      setErrors({});
+      scrollToTop();
+    }
+  }, [currentStep, formData, isStepValid]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -99,7 +252,7 @@ const App: React.FC = () => {
 
       // Validar tamaño del payload
       if (fotosSizeMB > 45) {
-        alert(`Las fotos son muy grandes (${fotosSizeMB.toFixed(1)} MB total). El límite es 50MB. Por favor comprime las imágenes.`);
+        showToast(`Las fotos son muy grandes (${fotosSizeMB.toFixed(1)} MB). Comprime las imágenes.`, 'warning', 6000);
         setIsSubmitting(false);
         return;
       }
@@ -120,42 +273,84 @@ const App: React.FC = () => {
       });
 
       console.log('✅ Respuesta recibida:', response.status, response.type);
-      
+      showToast('¡Formulario enviado con éxito! 🎉', 'success', 5000);
+      setShowSuccessConfetti(true);
       setPage('success');
     } catch (error) {
       console.error('❌ Error al enviar:', error);
       
       let errorMsg = 'Hubo un error al enviar. ';
+      let toastType: 'error' | 'warning' = 'error';
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        errorMsg += 'No se pudo conectar con el servidor. Verifica:\n' +
-          '1. Que la URL del script esté correcta\n' +
-          '2. Que el script esté implementado como "Aplicación web"\n' +
-          '3. Que el acceso sea "Cualquier persona"';
+        errorMsg += 'No se pudo conectar con el servidor.';
+        toastType = 'warning';
       } else if (error instanceof Error && error.message.includes('timeout')) {
-        errorMsg += 'El servidor tardó demasiado en responder. Las fotos pueden ser muy grandes.';
+        errorMsg += 'El servidor tardó demasiado. Las fotos pueden ser muy grandes.';
+        toastType = 'warning';
       } else {
         errorMsg += 'Por favor intenta de nuevo.';
       }
       
-      alert(errorMsg);
+      showToast(errorMsg, toastType, 6000);
     } finally {
       setIsSubmitting(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
+  const stepVariants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 50 : -50,
+      opacity: 0,
+      scale: 0.98,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+    },
+    exit: (direction: number) => ({
+      x: direction < 0 ? 50 : -50,
+      opacity: 0,
+      scale: 0.98,
+    }),
+  };
+
   const renderStep = () => {
-    switch (currentStep) {
-      case 0: return <Step1Personal data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} />;
-      case 1: return <Step2Medidas data={formData} onChange={handleInputChange} />;
-      case 2: return <Step3Salud data={formData} onChange={handleInputChange} onCheckboxChange={handleCheckboxChange} />;
-      case 3: return <Step4Alimentacion data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} onCheckboxChange={handleCheckboxChange} onSliderChange={handleSliderChange} />;
-      case 4: return <Step5Ejercicio data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} />;
-      case 5: return <Step6Lifestyle data={formData} onRadioChange={handleRadioChange} onSliderChange={handleSliderChange} onSelectChange={handleInputChange} />;
-      case 6: return <Step7Objetivos data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} />;
-      case 7: return <Step8Fotos data={formData} onFileChange={handleFileChange} />;
-      default: return null;
-    }
+    const stepContent = (() => {
+      switch (currentStep) {
+        case 0: return <Step1Personal data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} errors={errors} />;
+        case 1: return <Step2Medidas data={formData} onChange={handleInputChange} errors={errors} />;
+        case 2: return <Step3Salud data={formData} onChange={handleInputChange} onCheckboxChange={handleCheckboxChange} />;
+        case 3: return <Step4Alimentacion data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} onCheckboxChange={handleCheckboxChange} onSliderChange={handleSliderChange} />;
+        case 4: return <Step5Ejercicio data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} />;
+        case 5: return <Step6Lifestyle data={formData} onRadioChange={handleRadioChange} onSliderChange={handleSliderChange} onSelectChange={handleInputChange} />;
+        case 6: return <Step7Objetivos data={formData} onChange={handleInputChange} onRadioChange={handleRadioChange} />;
+        case 7: return <Step8Fotos data={formData} onFileChange={handleFileChange} />;
+        case 8: return <Step9Review data={formData} onEditStep={goToStep} />;
+        default: return null;
+      }
+    })();
+
+    return (
+      <AnimatePresence mode="wait" custom={direction}>
+        <motion.div
+          key={currentStep}
+          custom={direction}
+          variants={stepVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{
+            x: { type: 'spring', stiffness: 400, damping: 35 },
+            opacity: { duration: 0.2 },
+            scale: { duration: 0.2 },
+          }}
+        >
+          {stepContent}
+        </motion.div>
+      </AnimatePresence>
+    );
   };
 
   // ==========================================
@@ -570,7 +765,12 @@ const App: React.FC = () => {
               </div>
 
               <button
-                onClick={() => { setPage('landing'); setCurrentStep(0); setFormData(initialFormData); }}
+                onClick={() => { 
+                  clearStorage();
+                  setPage('landing'); 
+                  setCurrentStep(0); 
+                  setFormData(initialFormData); 
+                }}
                 className="btn-neon"
               >
                 Volver al inicio
@@ -587,6 +787,10 @@ const App: React.FC = () => {
   // ==========================================
   return (
     <div ref={formRef} className="grid-pattern" style={{ minHeight: '100vh', background: 'var(--dark-900)' }}>
+      {/* ===== Celebraciones ===== */}
+      <StepCompleteCelebration trigger={showStepCelebration} />
+      <Confetti trigger={showSuccessConfetti} count={100} duration={3000} />
+      
       {/* ===== Sticky Header ===== */}
       <div style={{
         background: 'rgba(17,17,17,0.92)', backdropFilter: 'blur(20px)',
@@ -634,6 +838,69 @@ const App: React.FC = () => {
       <div className="progress-neon">
         <div className="progress-fill" style={{ width: `${((currentStep + 1) / TOTAL_STEPS) * 100}%` }} />
       </div>
+
+      {/* ===== Restore Banner ===== */}
+      {showRestoreBanner && (
+        <div style={{ background: 'rgba(181,247,39,0.1)', borderBottom: '1px solid rgba(181,247,39,0.2)' }}>
+          <Container>
+            <Row className="py-3">
+              <Col xs={12}>
+                <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                  <div className="d-flex align-items-center gap-3">
+                    <div style={{
+                      width: 40, height: 40, minWidth: 40, borderRadius: 10,
+                      background: 'rgba(181,247,39,0.15)', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <RotateCcw size={20} style={{ color: 'var(--neon)' }} />
+                    </div>
+                    <div>
+                      <p className="mb-0" style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                        ¿Continuar donde lo dejaste?
+                      </p>
+                      <p className="mb-0" style={{ fontSize: 12, color: 'var(--dark-100)' }}>
+                        Tienes datos guardados de una sesión anterior
+                      </p>
+                    </div>
+                  </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const saved = loadFromStorage();
+                        if (saved) {
+                          const { data, step } = saved;
+                          setFormData(prev => ({ ...prev, ...data as Partial<FormData> }));
+                          setCurrentStep(step);
+                        }
+                        setShowRestoreBanner(false);
+                      }}
+                      className="btn-neon"
+                      style={{ padding: '10px 20px', fontSize: 13 }}
+                    >
+                      <FileText size={16} />
+                      Restaurar datos
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearStorage();
+                        setShowRestoreBanner(false);
+                      }}
+                      style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: 'var(--dark-700)', border: '1px solid var(--dark-500)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', color: 'var(--dark-200)',
+                      }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </Container>
+        </div>
+      )}
 
       {/* ===== Form Content ===== */}
       <Container className="py-4 py-md-5">

@@ -1,11 +1,19 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { Row, Col } from 'react-bootstrap';
 import { FormData } from '../types';
-import { Camera, Upload, X, User, RotateCcw, AlertCircle } from 'lucide-react';
+import { Camera, Upload, X, User, RotateCcw, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
+import { useToast } from '../components/Toast';
 
 interface Props {
   data: FormData;
   onFileChange: (name: keyof FormData, file: File | null) => void;
+}
+
+interface CompressionInfo {
+  originalSize: number;
+  compressedSize: number;
+  ratio: number;
 }
 
 interface PhotoCardProps {
@@ -15,12 +23,17 @@ interface PhotoCardProps {
   silhouette: 'front' | 'back' | 'side';
   file: File | null;
   onFileChange: (file: File | null) => void;
+  compressionInfo?: CompressionInfo | null;
 }
 
-const PhotoCard: React.FC<PhotoCardProps> = ({ label, description, icon, silhouette, file, onFileChange }) => {
+const PhotoCard: React.FC<PhotoCardProps> = ({ 
+  label, description, icon, silhouette, file, onFileChange, compressionInfo 
+}) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = React.useState<string | null>(null);
   const [dragOver, setDragOver] = React.useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const { showToast } = useToast();
 
   React.useEffect(() => {
     if (file) {
@@ -32,11 +45,70 @@ const PhotoCard: React.FC<PhotoCardProps> = ({ label, description, icon, silhoue
     }
   }, [file]);
 
-  const handleFile = useCallback((f: File) => {
-    if (f.type.startsWith('image/')) {
-      onFileChange(f);
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const compressImage = async (file: File): Promise<File> => {
+    const options = {
+      maxWidthOrHeight: 1920,
+      maxSizeMB: 2,
+      useWebWorker: true,
+      fileType: 'image/jpeg',
+      initialQuality: 0.8,
+    };
+
+    try {
+      return await imageCompression(file, options);
+    } catch (error) {
+      console.error('Error comprimiendo imagen:', error);
+      return file;
     }
-  }, [onFileChange]);
+  };
+
+  const handleFile = useCallback(async (f: File) => {
+    if (!f.type.startsWith('image/')) {
+      showToast('Por favor selecciona una imagen válida', 'warning');
+      return;
+    }
+
+    // Check file size before compression
+    if (f.size > 20 * 1024 * 1024) {
+      showToast('La imagen es muy grande (>20MB). Se intentará comprimir.', 'warning', 5000);
+    }
+
+    setIsCompressing(true);
+    
+    try {
+      const originalSize = f.size;
+      const compressedFile = await compressImage(f);
+      const compressedSize = compressedFile.size;
+      
+      // Store compression info for display
+      const info: CompressionInfo = {
+        originalSize,
+        compressedSize,
+        ratio: ((originalSize - compressedSize) / originalSize) * 100,
+      };
+      
+      (compressedFile as File & { compressionInfo?: CompressionInfo }).compressionInfo = info;
+      
+      onFileChange(compressedFile);
+      
+      if (info.ratio > 10) {
+        showToast(`Imagen comprimida: ${info.ratio.toFixed(0)}% menos (${formatFileSize(compressedSize)})`, 'success', 3000);
+      }
+    } catch (error) {
+      showToast('Error al procesar la imagen, usando original', 'warning');
+      onFileChange(f);
+    } finally {
+      setIsCompressing(false);
+    }
+  }, [onFileChange, showToast]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -100,7 +172,32 @@ const PhotoCard: React.FC<PhotoCardProps> = ({ label, description, icon, silhoue
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
 
-      {preview ? (
+      {isCompressing ? (
+        /* ===== COMPRESSION MODE ===== */
+        <div className="photo-upload-content">
+          <div className="photo-upload-icon-wrap" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}>
+            <Loader2 size={28} style={{ color: 'var(--neon)' }} className="animate-spin" />
+          </div>
+          <h4 className="photo-card-title">Comprimiendo...</h4>
+          <p className="photo-card-desc">Optimizando imagen para envío</p>
+          <div style={{ 
+            width: '80%', 
+            height: 4, 
+            background: 'var(--dark-500)', 
+            borderRadius: 2,
+            marginTop: 16,
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              height: '100%',
+              width: '60%',
+              background: 'var(--neon)',
+              borderRadius: 2,
+              animation: 'progress 1.5s ease-in-out infinite',
+            }} />
+          </div>
+        </div>
+      ) : preview ? (
         /* ===== PREVIEW MODE ===== */
         <div className="photo-preview-container">
           <img src={preview} alt={label} className="photo-preview-image" />
@@ -119,6 +216,25 @@ const PhotoCard: React.FC<PhotoCardProps> = ({ label, description, icon, silhoue
             {icon}
             <span>{label}</span>
           </div>
+          {compressionInfo && compressionInfo.ratio > 5 && (
+            <div style={{
+              position: 'absolute',
+              bottom: 12,
+              right: 12,
+              padding: '6px 12px',
+              borderRadius: 8,
+              background: 'rgba(181,247,39,0.9)',
+              color: 'var(--dark-900)',
+              fontSize: 11,
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}>
+              <CheckCircle size={12} />
+              -{compressionInfo.ratio.toFixed(0)}%
+            </div>
+          )}
         </div>
       ) : (
         /* ===== UPLOAD MODE ===== */
@@ -135,15 +251,23 @@ const PhotoCard: React.FC<PhotoCardProps> = ({ label, description, icon, silhoue
             <Upload size={14} />
             <span>Subir foto</span>
           </div>
-          <p className="photo-card-format">JPG, PNG o HEIC • Máx 10MB</p>
+          <p className="photo-card-format">JPG, PNG o HEIC • Auto-comprime</p>
         </div>
       )}
     </div>
   );
 };
 
-const Step8Fotos: React.FC<Props> = ({ data, onFileChange }) => (
-  <div className="animate-fade-in-up">
+const Step8Fotos: React.FC<Props> = ({ data, onFileChange }) => {
+  // Helper to get compression info from file
+  const getCompressionInfo = (file: File | null): CompressionInfo | null => {
+    if (!file) return null;
+    const info = (file as File & { compressionInfo?: CompressionInfo }).compressionInfo;
+    return info || null;
+  };
+
+  return (
+    <div className="animate-fade-in-up">
     {/* Header */}
     <div className="mb-4 mb-md-5">
       <div className="section-header">
@@ -207,6 +331,7 @@ const Step8Fotos: React.FC<Props> = ({ data, onFileChange }) => (
           silhouette="front"
           file={data.fotoFrente}
           onFileChange={(f) => onFileChange('fotoFrente', f)}
+          compressionInfo={getCompressionInfo(data.fotoFrente)}
         />
       </Col>
       <Col xs={12} md={4}>
@@ -217,6 +342,7 @@ const Step8Fotos: React.FC<Props> = ({ data, onFileChange }) => (
           silhouette="back"
           file={data.fotoEspalda}
           onFileChange={(f) => onFileChange('fotoEspalda', f)}
+          compressionInfo={getCompressionInfo(data.fotoEspalda)}
         />
       </Col>
       <Col xs={12} md={4}>
@@ -227,6 +353,7 @@ const Step8Fotos: React.FC<Props> = ({ data, onFileChange }) => (
           silhouette="side"
           file={data.fotoPerfil}
           onFileChange={(f) => onFileChange('fotoPerfil', f)}
+          compressionInfo={getCompressionInfo(data.fotoPerfil)}
         />
       </Col>
     </Row>
@@ -298,6 +425,7 @@ const Step8Fotos: React.FC<Props> = ({ data, onFileChange }) => (
       </Col>
     </Row>
   </div>
-);
+  );
+};
 
 export default Step8Fotos;

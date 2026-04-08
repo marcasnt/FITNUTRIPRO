@@ -12,10 +12,11 @@ interface InputFieldProps {
   required?: boolean;
   icon?: React.ReactNode;
   suffix?: string;
+  error?: string;
 }
 
 export const InputField: React.FC<InputFieldProps> = ({
-  label, name, value, onChange, type = 'text', placeholder, required, icon, suffix,
+  label, name, value, onChange, type = 'text', placeholder, required, icon, suffix, error,
 }) => (
   <div className="mb-4">
     <label className="form-label-dark">
@@ -25,7 +26,7 @@ export const InputField: React.FC<InputFieldProps> = ({
       {icon && (
         <div style={{
           position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
-          color: 'var(--dark-200)', display: 'flex', alignItems: 'center',
+          color: error ? '#ef4444' : 'var(--dark-200)', display: 'flex', alignItems: 'center',
         }}>
           {icon}
         </div>
@@ -38,6 +39,10 @@ export const InputField: React.FC<InputFieldProps> = ({
         placeholder={placeholder}
         required={required}
         className={`form-control-dark ${icon ? 'with-icon' : ''} ${suffix ? 'with-suffix' : ''}`}
+        style={error ? {
+          borderColor: '#ef4444',
+          boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.15)',
+        } : undefined}
       />
       {suffix && (
         <span style={{
@@ -48,6 +53,19 @@ export const InputField: React.FC<InputFieldProps> = ({
         </span>
       )}
     </div>
+    {error && (
+      <div style={{ 
+        display: 'flex', alignItems: 'center', gap: 6,
+        marginTop: 8, fontSize: 13, color: '#ef4444', fontWeight: 600 
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        {error}
+      </div>
+    )}
   </div>
 );
 
@@ -124,10 +142,11 @@ interface RadioGroupProps {
   options: { value: string; label: string; emoji?: string }[];
   required?: boolean;
   columns?: number;
+  error?: string;
 }
 
 export const RadioGroup: React.FC<RadioGroupProps> = ({
-  label, name: _name, value, onChange, options, required, columns = 2,
+  label, name: _name, value, onChange, options, required, columns = 2, error,
 }) => {
   const colSize = columns >= 4 ? 6 : columns === 3 ? 12 : 12;
   const colSizeSm = columns >= 4 ? 6 : columns === 3 ? 4 : 6;
@@ -152,6 +171,19 @@ export const RadioGroup: React.FC<RadioGroupProps> = ({
           </Col>
         ))}
       </Row>
+      {error && (
+        <div style={{ 
+          display: 'flex', alignItems: 'center', gap: 6,
+          marginTop: 12, fontSize: 13, color: '#ef4444', fontWeight: 600 
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {error}
+        </div>
+      )}
     </div>
   );
 };

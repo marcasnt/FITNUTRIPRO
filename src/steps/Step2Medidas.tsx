@@ -7,9 +7,10 @@ import { Ruler } from 'lucide-react';
 interface Props {
   data: FormData;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  errors?: Partial<Record<keyof FormData, string>>;
 }
 
-const Step2Medidas: React.FC<Props> = ({ data, onChange }) => {
+const Step2Medidas: React.FC<Props> = ({ data, onChange, errors = {} }) => {
   const peso = parseFloat(data.peso) || 0;
   const estatura = parseFloat(data.estatura) || 0;
   const imc = estatura > 0 ? peso / ((estatura / 100) ** 2) : 0;
@@ -46,12 +47,18 @@ const Step2Medidas: React.FC<Props> = ({ data, onChange }) => {
       {/* Peso y Estatura */}
       <Row>
         <Col xs={12} md={6}>
-          <InputField label="Peso actual" name="peso" value={data.peso} onChange={onChange}
-            type="number" placeholder="70" required suffix="kg" />
+          <InputField 
+            label="Peso actual" name="peso" value={data.peso} onChange={onChange}
+            type="number" placeholder="70" required suffix="kg" 
+            error={errors.peso}
+          />
         </Col>
         <Col xs={12} md={6}>
-          <InputField label="Estatura" name="estatura" value={data.estatura} onChange={onChange}
-            type="number" placeholder="170" required suffix="cm" />
+          <InputField 
+            label="Estatura" name="estatura" value={data.estatura} onChange={onChange}
+            type="number" placeholder="170" required suffix="cm" 
+            error={errors.estatura}
+          />
         </Col>
       </Row>
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Row, Col } from 'react-bootstrap';
 import {
-  User, Ruler, HeartPulse, UtensilsCrossed, Dumbbell, Moon, Target, Camera,
+  User, Ruler, HeartPulse, UtensilsCrossed, Dumbbell, Moon, Target, Camera, FileText,
 } from 'lucide-react';
 
 const steps = [
@@ -13,6 +13,7 @@ const steps = [
   { icon: Moon, label: 'Lifestyle', short: '6' },
   { icon: Target, label: 'Goals', short: '7' },
   { icon: Camera, label: 'Fotos', short: '8' },
+  { icon: FileText, label: 'Revisar', short: '9' },
 ];
 
 interface StepIndicatorProps {
